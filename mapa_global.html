@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EDC Network - Mapa Global de Emplazamientos VGT (Fase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    #map-global { height: 100%; width: 100%; }
+    .leaflet-popup-content-wrapper { background: #0f172a !important; color: #f8fafc !important; border: 1px solid #334155; border-radius: 12px; }
+    .leaflet-popup-tip { background: #0f172a !important; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-full flex flex-col overflow-hidden font-sans">
+  <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex justify-between items-center z-50 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="bg-emerald-600 p-2 rounded-xl font-black text-xs text-white">EDC</div>
+      <h1 class="text-sm font-extrabold tracking-wide text-white">MAPA GLOBAL DE EMPLAZAMIENTOS DE FIBRA ÓPTICA (FASE 2)</h1>
+    </div>
+    <button onclick="window.close()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold">Cerrar Visor</button>
+  </header>
+  <main class="flex-1 relative">
+    <div id="map-global"></div>
+  </main>
+
+  <script>
+    let globalMap;
+    window.onload = function() {
+      globalMap = L.map('map-global').setView([10.491, -66.852], 14);
+      const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri' });
+      const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}');
+      L.layerGroup([esriSat, esriLabels]).addTo(globalMap);
+
+      renderizarEmplazamientosGlobales();
+    };
+
+    function renderizarEmplazamientosGlobales() {
+      let trabajosCampo = JSON.parse(localStorage.getItem('vgt_trabajos_campo')) || [];
+      let equiposPasivos = JSON.parse(localStorage.getItem('vgt_equipos_pasivos')) || [];
+      const inspectorColors = ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4"];
+
+      // Filtrar estrictamente solo los trabajos que pertenecen a la Fase 2 (Emplazamiento)
+      let trabajosFase2 = trabajosCampo.filter(t => t.fase === 'Fase 2');
+
+      trabajosFase2.forEach((trabajo, index) => {
+        let color = inspectorColors[index % inspectorColors.length];
+        if (trabajo.puntos && trabajo.puntos.length > 0) {
+          let latlngs = trabajo.puntos.map(p => [p.lat, p.lng]);
+          
+          // Trazado sólido en color distintivo para Fase 2
+          L.polyline(latlngs, { color: color, weight: 6, opacity: 0.9 }).addTo(globalMap);
+
+          trabajo.puntos.forEach((p, idx) => {
+            let markerIcon = L.divIcon({
+              className: '',
+              html: `<div style="background-color: ${color};" class="border-2 border-slate-950 text-slate-950 rounded-full w-7 h-7 flex items-center justify-center font-bold text-[11px] font-mono">${idx + 1}</div>`,
+              iconSize: [28, 28], iconAnchor: [14, 14]
+            });
+            L.marker([p.lat, p.lng], { icon: markerIcon }).addTo(globalMap).bindPopup(`
+              <div class="text-xs space-y-1">
+                <b style="color: ${color};">[FASE 2: EMPLAZAMIENTO] ${p.label}</b><br>
+                <b>Proyecto:</b> ${trabajo.correlativo}<br>
+                <b>Inspector:</b> ${trabajo.inspector}<br>
+                <b>Actividad:</b> ${p.actividad}<br>
+                <b>Obs:</b> ${p.observacion || 'N/A'}<br>
+                <b>Estampado NTP:</b> ${p.timestamp || 'N/A'}<br>
+                ${p.foto ? `<img src="${p.foto}" class="w-full h-28 object-cover rounded mt-1">` : ''}
+              </div>
+            `);
+          });
+        }
+      });
+
+      // Renderizar también todos los equipos pasivos y reservas registrados en los sótanos / tanquillas
+      equiposPasivos.forEach(eq => {
+        let iconEq = L.divIcon({
+          className: '',
+          html: `<div class="bg-emerald-500 text-slate-950 rounded-lg px-2 py-1 shadow-lg text-[10px] font-extrabold font-mono flex items-center gap-1 border border-slate-950">📦 ${eq.tipoEquipo}</div>`,
+          iconSize: [110, 28], iconAnchor: [55, 14]
+        });
+        L.marker([eq.lat, eq.lng], { icon: iconEq }).addTo(globalMap).bindPopup(`
+          <div class="text-xs space-y-1">
+            <b class="text-emerald-400">EQUIPO / RESERVA (Fase 2)</b><br>
+            <b>Ubicación:</b> ${eq.ubicacion}<br>
+            <b>Proyecto:</b> ${eq.correlativo}<br>
+            <b>Elemento:</b> ${eq.tipoEquipo}<br>
+            <b>Reserva:</b> ${eq.reservaMetros}m<br>
+            <b>Detalles:</b> ${eq.detalles}<br>
+            <b>Registro NTP:</b> ${eq.timestamp || 'N/A'}
+          </div>
+        `);
+      });
+    }
+  </script>
+</body>
+</html>
