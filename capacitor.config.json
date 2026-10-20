@@ -1,0 +1,6 @@
+{
+  "appId": "com.edcnetwork.vgt",
+  "appName": "EDC VGT Campo",
+  "webDir": ".",
+  "bundledWebRuntime": false
+}
